@@ -11,6 +11,11 @@ api = Api(
 )
 
 task_model = api.model("Task", {
+    "title": fields.String(required=True),
+    "completed": fields.Boolean(required=True)
+})
+
+update_model = api.model("UpdateTask", {
     "title": fields.String(required=False),
     "completed": fields.Boolean(required=False)
 })
@@ -55,7 +60,7 @@ class Task(Resource):
             "message": "Task not found"
         },404
 
-    @api.expect(task_model, validate=True)
+    @api.expect(update_model, validate=True)
     def patch(self, id):
         data = request.get_json()
         for task in tasks:
