@@ -1,6 +1,10 @@
 from flask import Flask
 from routes.task_routes import task_bp
+from database import init_db
+
 app = Flask(__name__)
+
+init_db()
 
 @app.route("/health")
 def health():
