@@ -1,5 +1,6 @@
 from flask import Blueprint,jsonify,request
 from flask_restx import Api,Resource,fields
+from database import conn,cursor
 
 task_bp = Blueprint("task",__name__)
 
@@ -20,67 +21,98 @@ update_model = api.model("UpdateTask", {
     "completed": fields.Boolean(required=False)
 })
 
-tasks = []
 
 @api.route("/tasks")
 class TaskList(Resource):
     def get(self):
-        return tasks,200
+        cursor.execute("SELECT * FROM tasks")
+        tasks = cursor.fetchall()
 
+        return tasks,200
+    
     @api.expect(task_model, validate=True)
     def post(self):
         data = request.get_json()
-        tasks.append({
-            "id": len(tasks) + 1,
-            "title":data["title"],
-            "completed":data["completed"]
-            })
+        cursor.execute("INSERT INTO tasks (title, completed) VALUES (?,?)", (data["title"], data["completed"]))
+        conn.commit()
         return {"message":"Add Succufully"},201
 
     
 @api.route("/tasks/<int:id>")
 class Task(Resource):
     def get(self, id):
-        for task in tasks:
-            if task["id"] == id:
-                return task,200
-        return {"message": f"task not found {id}"},404
+        cursor.execute("SELECT * FROM tasks WHERE ID = ?",(id,))
+        task = cursor.fetchone()
+
+        if(task is None):
+            return {"message": f"task not found {id}"},404
+        
+        return {
+            "id": task[0],
+            "title": task[1],
+            "completed": bool(task[2])
+        }, 200    
 
     @api.expect(task_model, validate=True)
     def put(self, id):
         data = request.get_json()
-        for task in tasks:
-            if task["id"] == id:
-                task["title"] = data["title"]
-                task["completed"] = data["completed"]
-                return {
-                    "message": "replace succufully"
-                    },200
-        return {
-            "message": "Task not found"
-        },404
 
+        cursor.execute("SELECT * FROM tasks WHERE id = ?",(id,))
+        task = cursor.fetchone()
+
+        if(task is None):
+            return {"message": f"task not found {id}"},404
+        
+        cursor.execute("UPDATE tasks SET title = ?, completed = ? WHERE id = ?", (data["title"], data["completed"], id))
+
+        conn.commit()
+
+        return {
+            "message" : "Update Succufully"
+        },200
+
+        
     @api.expect(update_model, validate=True)
     def patch(self, id):
         data = request.get_json()
-        for task in tasks:
-            if task["id"] == id:
-                task["title"] = data.get("title", task["title"])
-                task["completed"] = data.get("completed",task["completed"])
-                return {
-                    "message": "upadte succufully"
-                    },200
-        return {
-            "message": "Task not found"
-            },404
 
-    def delete(self,id):
-        for task in tasks:
-            if task["id"] == id:
-                tasks.remove(task)
-                return {
-                    "message": "delete succufully"
-                    },200
+        cursor.execute("SELECT * FROM tasks WHERE id = ?",(id,))
+
+        task = cursor.fetchone()
+        
+        if(task is None):
+            return {"message": f"task not found {id}"},404
+        
+        title = task[1]
+        completed = task[2]
+        cursor.execute("UPDATE tasks SET title = ?, completed = ? WHERE id = ?", (data.get("title",title), data.get("completed", completed), id))
+
+        conn.commit()
+
         return {
-            "message": "Task not found"
-            },404
+            "message" : "Update Succufully"
+            },200
+
+    def delete(self, id):
+
+        cursor.execute(
+            "SELECT * FROM tasks WHERE id = ?",
+            (id,)
+        )
+        task = cursor.fetchone()
+
+        if task is None:
+            return {
+                "message": "Task not found"
+            }, 404
+
+        cursor.execute(
+            "DELETE FROM tasks WHERE id = ?",
+            (id,)
+        )
+
+        conn.commit()
+
+        return {
+            "message": "Task deleted successfully"
+        }, 200
