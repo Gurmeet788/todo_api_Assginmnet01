@@ -25,122 +25,192 @@ update_model = api.model("UpdateTask", {
 @api.route("/tasks")
 class TaskList(Resource):
     def get(self):
+
         conn = get_connection()
         cursor = conn.cursor()
 
         try:
             cursor.execute("SELECT * FROM tasks")
-            tasks = cursor.fetchall()
-            
+
+            rows = cursor.fetchall()
+
+            tasks = [
+                {
+                    "id":row[0],
+                    "title":row[1],
+                    "completed":row[0]
+                }
+                for row in rows
+            ]
+
             return tasks,200
+        
         finally:
+
             cursor.close()
+
             conn.close()
     
     @api.expect(task_model, validate=True)
     def post(self):
+
         conn = get_connection()
+
         cursor = conn.cursor()
 
         try:
+
             data = request.get_json()
-            cursor.execute("INSERT INTO tasks (title, completed) VALUES (%s,%s)", (data["title"], data["completed"]))
+
+            cursor.execute("""INSERT INTO tasks (title, completed)
+              VALUES (%s,%s) 
+              RETURNING id, title, completed""", 
+              (data["title"], data["completed"]))
+
+            task = cursor.fetchone()
             conn.commit()
-            return {"message":"Add Succufully"},201
+
+            return {
+                "message":"Add Successfully with these values",
+                "id":task[0],
+                "title":task[1],
+                "completed":task[2]
+            },201
+        
         finally:
+
             cursor.close()
+
             conn.close()       
     
 @api.route("/tasks/<int:id>")
 class Task(Resource):
     def get(self, id):
+
         conn = get_connection()
         cursor = conn.cursor()
 
         try:
             cursor.execute("SELECT * FROM tasks WHERE ID = %s",(id,))
+
             task = cursor.fetchone()
+
             if(task is None):
+
                 return {"message": f"task not found {id}"},404
+            
             return {
                 "id": task[0],
                 "title": task[1],
                 "completed": bool(task[2])
-                }, 200    
+                }, 200 
+           
         finally:
+
             cursor.close()
+
             conn.close()
 
     @api.expect(task_model, validate=True)
     def put(self, id):
+
         conn = get_connection()
+
         cursor = conn.cursor()
 
         try:
+
             data = request.get_json()
-            cursor.execute("SELECT * FROM tasks WHERE id = %s",(id,))
+
+            cursor.execute("""UPDATE tasks SET 
+            title = %s, 
+            completed = %s 
+            WHERE id = %s RETURNING id, title, completed""", 
+            (data["title"], data["completed"], id))
+
             task = cursor.fetchone()
+
             if(task is None):
+
                 return {"message": f"task not found {id}"},404
-            cursor.execute("UPDATE tasks SET title = %s, completed = %s WHERE id = %s", (data["title"], data["completed"], id))
+            
             conn.commit()
+
             return {
-                "message" : "Update Succufully"
+                "message" : "Update Succufully",
+                "id" : task[0],
+                "title" : task[1],
+                "completed" : task[2]
                 },200
+        
         finally:
+
             cursor.close()
+
             conn.close()
 
         
     @api.expect(update_model, validate=True)
     def patch(self, id):
+
         conn = get_connection()
+
         cursor = conn.cursor()
 
         try:
             data = request.get_json()
+
             cursor.execute("SELECT * FROM tasks WHERE id = %s",(id,))
+
             task = cursor.fetchone()
+
             if(task is None):
                 return {"message": f"task not found {id}"},404
+            
             title = task[1]
             completed = task[2]
-            cursor.execute("UPDATE tasks SET title = %s, completed = %s WHERE id = %s", (data.get("title",title), data.get("completed", completed), id))
+
+            cursor.execute("UPDATE tasks SET title = %s, completed = %s WHERE id = %s RETURNING id, title, completed", (data.get("title",title), data.get("completed", completed), id))
+
+            updated_task = cursor.fetchone()
+
             conn.commit()
+
             return {
-                "message" : "Update Succufully"
+                "message" : "Update Succufully",
+                "id" : updated_task[0],
+                "title" : updated_task[1],
+                "completed" : updated_task[2]
                 },200
         finally:
+
             cursor.close()
+
             conn.close()
 
     def delete(self, id):
+
         conn = get_connection()
+
         cursor = conn.cursor()
 
         try:
-            cursor.execute(
-                "SELECT * FROM tasks WHERE id = %s",
-                (id,)
-            )
+            cursor.execute("DELETE FROM tasks WHERE id = %s RETURNING id",(id,))
+
             task = cursor.fetchone()
+
             if task is None:
                 return {
                     "message": "Task not found"
                 }, 404
 
-            cursor.execute(
-                "DELETE FROM tasks WHERE id = %s",
-                (id,)
-            )
-
             conn.commit()
 
-            return {
-                "message": "Task deleted successfully"
-            }, 200
+            return "", 204
 
         finally:
+
             cursor.close()
+
             conn.close()
         
