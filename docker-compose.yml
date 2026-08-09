@@ -1,4 +1,13 @@
 services:
+  api:
+   build: .
+   ports:
+    - "5000:5000"
+   environment:
+     DATABASE_URL: ${DATABASE_URL}
+   depends_on :
+     - db  
+
   db:
     image: postgres:17
     container_name: postgres_db
@@ -6,8 +15,6 @@ services:
       POSTGRES_USER: gurmeet
       POSTGRES_PASSWORD: root123
       POSTGRES_DB: tasks
-    ports:
-       - 5432:5432 
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
